@@ -1,0 +1,286 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foto Monitor // Painel de Monitoramento de Imagens RSS</title>
+    
+    <!-- Google Fonts: Outfit (Títulos) e Inter (Texto) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome para ícones premium -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Glows para estética premium -->
+    <div class="glow-bg glow-primary"></div>
+    <div class="glow-bg glow-secondary"></div>
+    
+    <div class="app-container">
+        <!-- CABEÇALHO DO PAINEL -->
+        <header class="main-header glass">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-camera-retro"></i>
+                    <div class="pulse-ring"></div>
+                </div>
+                <div class="logo-text">
+                    <h1>Foto<span>Monitor</span></h1>
+                    <p>Monitor de Agências e Direitos de Imagem</p>
+                </div>
+            </div>
+            
+            <div class="feed-source">
+                <span class="source-badge">
+                    <span class="pulse-indicator"></span> Live RSS: O Globo
+                </span>
+                <span class="source-url" title="https://oglobo.globo.com/rss/oglobo">oglobo.globo.com/rss/oglobo</span>
+            </div>
+            
+            <div class="control-actions">
+                <!-- Temporizador de Auto-Atualização -->
+                <div class="timer-widget" id="timerWidget" title="Tempo até a próxima atualização automática">
+                    <svg class="progress-ring" width="36" height="36">
+                        <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.1)" stroke-width="3" fill="transparent" r="15" cx="18" cy="18"/>
+                        <circle class="progress-ring__circle" id="timerRing" stroke="var(--primary-color)" stroke-width="3" fill="transparent" r="15" cx="18" cy="18"/>
+                    </svg>
+                    <span class="timer-text" id="timerText">5m</span>
+                </div>
+                
+                <button class="btn btn-primary" id="btnRefresh">
+                    <i class="fa-solid fa-rotate"></i> Atualizar Agora
+                </button>
+            </div>
+        </header>
+
+        <!-- SEÇÃO DE ESTATÍSTICAS E KPIS -->
+        <section class="stats-container">
+            <!-- KPI Total -->
+            <div class="kpi-card glass" data-filter="all">
+                <div class="kpi-icon icon-blue">
+                    <i class="fa-solid fa-images"></i>
+                </div>
+                <div class="kpi-data">
+                    <h3 id="statTotal">00</h3>
+                    <p>Imagens Monitoradas</p>
+                </div>
+                <div class="kpi-trend trend-neutral">Ativo</div>
+            </div>
+            
+            <!-- KPI Getty (Alto Risco) -->
+            <div class="kpi-card glass risk-high" data-filter="risk-high">
+                <div class="kpi-icon icon-red">
+                    <i class="fa-solid fa-copyright"></i>
+                </div>
+                <div class="kpi-data">
+                    <h3 id="statGetty">00</h3>
+                    <p>Getty e Agências Globais</p>
+                </div>
+                <div class="kpi-trend trend-down">Crítico</div>
+            </div>
+            
+            <!-- KPI AFP (Assinatura) -->
+            <div class="kpi-card glass risk-signature" data-filter="risk-signature">
+                <div class="kpi-icon icon-orange">
+                    <i class="fa-solid fa-newspaper"></i>
+                </div>
+                <div class="kpi-data">
+                    <h3 id="statAFP">00</h3>
+                    <p>Assinatura</p>
+                </div>
+                <div class="kpi-trend trend-info">Assinatura</div>
+            </div>
+            
+            <!-- KPI Divulgação -->
+            <div class="kpi-card glass risk-medium" data-filter="risk-medium">
+                <div class="kpi-icon icon-purple">
+                    <i class="fa-solid fa-bullhorn"></i>
+                </div>
+                <div class="kpi-data">
+                    <h3 id="statPromo">00</h3>
+                    <p>Fotos de Divulgação</p>
+                </div>
+                <div class="kpi-trend trend-warning">Comercial</div>
+            </div>
+            
+            <!-- KPI Sem Crédito (Alerta) -->
+            <div class="kpi-card glass risk-warning" data-filter="risk-alert">
+                <div class="kpi-icon icon-yellow">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div class="kpi-data">
+                    <h3 id="statNoCredit">00</h3>
+                    <p>Sem Crédito Declarado</p>
+                </div>
+                <div class="kpi-trend trend-danger">Risco</div>
+            </div>
+        </section>
+
+        <!-- PAINEL DE DISTRIBUIÇÃO E BUSCA -->
+        <section class="distribution-search-panel glass">
+            <div class="distribution-area">
+                <div class="panel-subtitle">Distribuição por Categoria</div>
+                <div class="dist-bar-wrapper">
+                    <div class="dist-bar" id="distBar">
+                        <!-- Preenchido dinamicamente via JS -->
+                        <div class="dist-segment seg-internal" style="width: 40%" title="Interno: 40%"></div>
+                        <div class="dist-segment seg-getty" style="width: 25%" title="Getty/Agência: 25%"></div>
+                        <div class="dist-segment seg-promo" style="width: 20%" title="Divulgação: 20%"></div>
+                        <div class="dist-segment seg-gov" style="width: 10%" title="Institucional: 10%"></div>
+                        <div class="dist-segment seg-nocredit" style="width: 5%" title="Sem Crédito: 5%"></div>
+                    </div>
+                </div>
+                <div class="dist-legend" id="distLegend">
+                    <!-- Preenchido dinamicamente -->
+                </div>
+            </div>
+            
+            <div class="search-filter-area">
+                <div class="select-wrapper">
+                    <select id="sortSelect">
+                        <option value="newest">Mais recentes primeiro</option>
+                        <option value="oldest">Mais antigas primeiro</option>
+                        <option value="agency">Agrupar por Agência</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- FILTROS POR CATEGORIA -->
+        <section class="filter-bar">
+            <button class="filter-btn active" data-category="all">
+                <i class="fa-solid fa-list"></i> Todas as Imagens
+            </button>
+            <button class="filter-btn" data-category="Interno (O Globo)">
+                <span class="dot dot-blue"></span> Interno (O Globo)
+            </button>
+            <button class="filter-btn" data-category="Getty / Agência Externa">
+                <span class="dot dot-red"></span> Getty / Agências
+            </button>
+            <button class="filter-btn" data-category="Assinatura">
+                <span class="dot dot-orange"></span> Assinatura
+            </button>
+            <button class="filter-btn" data-category="Divulgação / Comercial">
+                <span class="dot dot-purple"></span> Divulgação / Comercial
+            </button>
+            <button class="filter-btn" data-category="Institucional / Público">
+                <span class="dot dot-green"></span> Institucional / Público
+            </button>
+            <button class="filter-btn" data-category="Sem Crédito">
+                <span class="dot dot-yellow"></span> Sem Crédito
+            </button>
+            <button class="filter-btn" data-category="Outros / Fontes não tabeladas">
+                <span class="dot dot-gray"></span> Outros / Fontes não tabeladas
+            </button>
+        </section>
+
+        <!-- FEED E GALERIA DE FOTOS -->
+        <main class="gallery-section">
+            <div class="section-title">
+                <h2>Galeria de Monitoramento <span>Em Tempo Real</span></h2>
+                <p id="galleryStatus">Mostrando 0 de 0 imagens</p>
+            </div>
+            
+            <!-- Toast de Atualização -->
+            <div class="toast-update" id="toastUpdate">
+                <i class="fa-solid fa-circle-check"></i> <span id="toastMessage">Galeria atualizada com novas imagens!</span>
+            </div>
+
+            <!-- Grade da Galeria -->
+            <div class="photo-grid" id="photoGrid">
+                <!-- Preenchido dinamicamente via JS -->
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Sincronizando com o feed RSS do O Globo...</p>
+                </div>
+            </div>
+        </main>
+        
+        <!-- RODAPÉ -->
+        <footer class="main-footer">
+            <p>Foto Monitor &copy; 2026. Desenvolvido para Auditoria e Monitoramento de Direitos Autorais e Fontes no site O Globo.</p>
+            <p class="api-status"><i class="fa-solid fa-server"></i> Status do Servidor API: <span id="apiStatus" class="status-online">Online</span></p>
+        </footer>
+    </div>
+
+    <!-- MODAL DE DETALHES DE IMAGEM -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content glass">
+            <button class="modal-close" id="modalClose">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="modal-grid">
+                <!-- Imagem -->
+                <div class="modal-image-wrapper">
+                    <img id="modalImg" src="" alt="Imagem em alta resolução">
+                    <div class="modal-image-overlay">
+                        <span id="modalNewsCategory" class="news-cat-badge">Geral</span>
+                        <span id="modalDate" class="date-badge"><i class="fa-solid fa-calendar-days"></i> Há poucos minutos</span>
+                    </div>
+                </div>
+                
+                <!-- Informações e Auditoria -->
+                <div class="modal-info-panel">
+                    <div class="modal-news-title">
+                        <h3 id="modalTitle">Título da notícia vinculada</h3>
+                        <div class="modal-link-actions">
+                            <a id="modalArticleLink" href="#" target="_blank" class="article-link">
+                                Ler matéria completa <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </a>
+                            <button id="modalCopyLink" type="button" class="article-link copy-link-btn">
+                                <i class="fa-regular fa-copy"></i> Copiar link da matéria
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Ficha de Crédito / Agência -->
+                    <div class="modal-info-card">
+                        <div class="info-row">
+                            <span class="info-label">Crédito Declarado:</span>
+                            <span class="info-val highlight" id="modalCredit">Evaristo Sá / AFP</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Categoria de Direitos:</span>
+                            <span class="info-val" id="modalCategory">Getty / Agência Externa</span>
+                        </div>
+                    </div>
+                    
+                    <!-- ANÁLISE DE DIREITOS E PONTO DE ATENÇÃO -->
+                    <div class="audit-card" id="modalAuditCard">
+                        <div class="audit-header">
+                            <div class="audit-icon" id="modalAuditIcon">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                            <div class="audit-header-text">
+                                <h4 id="modalAuditTitle">Ponto de Atenção - Licenciamento Exclusivo</h4>
+                                <span class="risk-badge" id="modalRiskBadge">RISCO ALTO</span>
+                            </div>
+                        </div>
+                        <p class="audit-text" id="modalAuditDesc">
+                            Esta foto pertence a uma agência internacional (Getty/AFP). O reuso deste material em canais próprios ou redes sociais sem licenciamento ativo e direto é estritamente proibido e passível de pesadas multas contratuais.
+                        </p>
+                    </div>
+                    
+                    <!-- Legenda da Imagem -->
+                    <div class="modal-caption-area">
+                        <h4>Legenda e Descrição Contextual</h4>
+                        <p class="caption-text" id="modalCaption">
+                            Legenda descritiva da imagem extraída do feed XML do O Globo contendo detalhes sobre quem, quando e onde.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Efeito sonoro sutil de notificação de novas imagens (opcional) -->
+    <audio id="notificationSound" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
+
+    <script src="app.js"></script>
+</body>
+</html>
