@@ -9,6 +9,8 @@ import sys
 import html
 from datetime import datetime
 from urllib.parse import urlparse
+from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
 
 PORT = 8001
 WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +49,10 @@ def classify_credit(credit_text):
     if not credit:
         return ("Sem Credito", "alerta", "Atencao: Esta imagem nao possui creditos definidos. Risco de infracao de direitos autorais.")
 
+    # Regra especifica: creditos da Agencia Brasil sao fonte publica
+    if "agência brasil" in credit or "agencia brasil" in credit:
+        return ("Institucional / Publico", "baixo_risco", f"Fonte Publica: ({credit_text}). Uso livre para imprensa.")
+
     # 1. Parceiro Pago = Material Pago por Unidade (RISCO ALTO)
     if "parceiro" in credit:
         return ("Parceiro Pago / Unitario", "alto", f"Material Pago por Unidade: ({credit_text}). Foto licenciada individualmente. Alto risco de reuso.")
@@ -58,7 +64,14 @@ def classify_credit(credit_text):
             return ("Assinatura ", "assinatura", f"Cobertura via Assinatura: ({credit_text}). Disponivel atraves de contrato institucional.")
 
     # 3. Getty / Agencias Internacionais (RISCO ALTO)
-    getty_keywords = ["getty", "reuters", "ap photo", "associated press", "efe", "shutterstock", "istock"]
+    getty_keywords = [
+        "getty", "reuters", "ap photo", "associated press", "efe", "shutterstock", "istock",
+        "agência enquadrar", "agencia enquadrar", "arion marinho", "atopress", "brazil photo press",
+        "código19", "codigo19", "cris faga", "diaesportivo", "flávio hopp", "flavio hopp", "fotorua",
+        "fotoarena", "framephoto", "ishoot", "lc moreira", "mafalda press", "mdjphotos", "mochilapress",
+        "ofotográfico", "ofotografico", "onzex press", "pera photo", "photo premium", "thenews2",
+        "w9press", "wesley santos", "wpp", "zimel press"
+    ]
     for keyword in getty_keywords:
         if keyword in credit:
             return ("Getty / Agencia Externa", "alto", f"Alerta de Licenciamento: Foto de agencia internacional ({credit_text}). Requer licenca paga.")
@@ -185,17 +198,19 @@ def fetch_and_parse_rss():
             
             formatted_date = pub_date
             try:
-                date_clean = re.sub(r'\s[+-]\d+$', '', pub_date)
-                dt = datetime.strptime(date_clean, "%a, %d %b %Y %H:%M:%S")
+                dt = parsedate_to_datetime(pub_date)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                dt_sp = dt.astimezone(ZoneInfo("America/Sao_Paulo"))
                 months = {
                     "Jan": "Jan", "Feb": "Fev", "Mar": "Mar", "Apr": "Abr",
                     "May": "Mai", "Jun": "Jun", "Jul": "Jul", "Aug": "Ago",
                     "Sep": "Set", "Oct": "Out", "Nov": "Nov", "Dec": "Dez"
                 }
-                day = dt.strftime("%d")
-                month_pt = months.get(dt.strftime("%b"), dt.strftime("%b"))
-                year = dt.strftime("%Y")
-                time_str = dt.strftime("%H:%M")
+                day = dt_sp.strftime("%d")
+                month_pt = months.get(dt_sp.strftime("%b"), dt_sp.strftime("%b"))
+                year = dt_sp.strftime("%Y")
+                time_str = dt_sp.strftime("%H:%M")
                 formatted_date = f"{day} de {month_pt} de {year} as {time_str}"
             except Exception:
                 pass

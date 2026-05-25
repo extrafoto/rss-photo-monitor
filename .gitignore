@@ -1,0 +1,6 @@
+.netlify/
+node_modules/
+__pycache__/
+*.pyc
+*.zip
+

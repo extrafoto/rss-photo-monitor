@@ -104,7 +104,7 @@
                     <h3 id="statPromo">00</h3>
                     <p>Fotos de Divulgação</p>
                 </div>
-                <div class="kpi-trend trend-warning">Comercial</div>
+                <div class="kpi-trend trend-warning">Divulgação</div>
             </div>
             
             <!-- KPI Sem Crédito (Alerta) -->
@@ -141,6 +141,11 @@
             
             <div class="search-filter-area">
                 <div class="select-wrapper">
+                    <select id="editoriaSelect">
+                        <option value="all">Todas as editorias</option>
+                    </select>
+                </div>
+                <div class="select-wrapper">
                     <select id="sortSelect">
                         <option value="newest">Mais recentes primeiro</option>
                         <option value="oldest">Mais antigas primeiro</option>
@@ -164,8 +169,8 @@
             <button class="filter-btn" data-category="Assinatura">
                 <span class="dot dot-orange"></span> Assinatura
             </button>
-            <button class="filter-btn" data-category="Divulgação / Comercial">
-                <span class="dot dot-purple"></span> Divulgação / Comercial
+            <button class="filter-btn" data-category="Divulgação">
+                <span class="dot dot-purple"></span> Divulgação
             </button>
             <button class="filter-btn" data-category="Institucional / Público">
                 <span class="dot dot-green"></span> Institucional / Público

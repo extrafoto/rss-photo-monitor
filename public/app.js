@@ -9,6 +9,7 @@ const AppState = {
     filteredImages: [],   // Imagens após pesquisa, filtro e ordenação
     previousUrls: new Set(), // URLs já vistas na requisição anterior para detectar novidades
     currentFilter: 'all', // Filtro de categoria ativo
+    editoriaFilter: 'all', // Filtro de editoria (editoria mãe)
     riskFilter: 'all',    // Filtro de risco ativo (vindo dos KPIs)
     sortBy: 'newest',     // Método de ordenação: newest, oldest, agency
     autoRefreshInterval: 300, // Tempo de auto-refresh em segundos (5 minutos)
@@ -19,6 +20,22 @@ const AppState = {
 
 const RSS_FEED_URL = "https://oglobo.globo.com/rss/oglobo";
 const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:8001' : '';
+const EDITORIAS = [
+    "Economia",
+    "Política",
+    "Rio",
+    "Esportes",
+    "Cultura",
+    "Brasil",
+    "Mundo",
+    "Saúde",
+    "Blogs",
+    "Opinião",
+    "Ela",
+    "RioShow",
+    "Play",
+    "Fato ou Fake"
+];
 
 // Elementos do DOM
 const DOM = {
@@ -26,6 +43,7 @@ const DOM = {
     btnRefresh: document.getElementById('btnRefresh'),
     timerText: document.getElementById('timerText'),
     timerRing: document.getElementById('timerRing'),
+    editoriaSelect: document.getElementById('editoriaSelect'),
     sortSelect: document.getElementById('sortSelect'),
     galleryStatus: document.getElementById('galleryStatus'),
     toastUpdate: document.getElementById('toastUpdate'),
@@ -87,8 +105,18 @@ document.addEventListener('DOMContentLoaded', () => {
     startCountdown();
     
     // Configurar Event Listeners
+    populateEditoriaSelect();
     setupEventListeners();
 });
+
+function populateEditoriaSelect() {
+    if (!DOM.editoriaSelect) return;
+    const options = [
+        `<option value="all">Todas as editorias</option>`,
+        ...EDITORIAS.map(ed => `<option value="${ed.toLowerCase()}">${ed}</option>`)
+    ];
+    DOM.editoriaSelect.innerHTML = options.join('');
+}
 
 function setupEventListeners() {
     // Botão de Refresh manual
@@ -107,6 +135,12 @@ function setupEventListeners() {
     // Evento de Ordenação
     DOM.sortSelect.addEventListener('change', (e) => {
         AppState.sortBy = e.target.value;
+        applyFiltersAndRender();
+    });
+
+    // Evento de filtro por editoria (editoria mãe)
+    DOM.editoriaSelect.addEventListener('change', (e) => {
+        AppState.editoriaFilter = e.target.value;
         applyFiltersAndRender();
     });
     
@@ -415,17 +449,31 @@ function inferEditoriaFromLink(link, fallbackCategory = "Geral") {
 function formatPubDate(pubDateRaw) {
     if (!pubDateRaw) return "Data Indisponível";
     try {
-        const dateClean = pubDateRaw.replace(/\s[+-]\d+$/, ''); // remove timezone offset
-        const date = new Date(dateClean);
+        const date = new Date(pubDateRaw);
         if (isNaN(date.getTime())) return pubDateRaw;
-        
-        const day = date.getDate().toString().padStart(2, '0');
-        const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-        const month = months[date.getMonth()];
-        const year = date.getFullYear();
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        
+
+        const parts = new Intl.DateTimeFormat('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        }).formatToParts(date);
+
+        const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+        const monthMap = {
+            "jan.": "Jan", "fev.": "Fev", "mar.": "Mar", "abr.": "Abr", "mai.": "Mai", "jun.": "Jun",
+            "jul.": "Jul", "ago.": "Ago", "set.": "Set", "out.": "Out", "nov.": "Nov", "dez.": "Dez"
+        };
+        const month = monthMap[(map.month || "").toLowerCase()] || map.month;
+
+        const day = map.day;
+        const year = map.year;
+        const hours = map.hour;
+        const minutes = map.minute;
+
         return `${day} de ${month} de ${year} às ${hours}:${minutes}`;
     } catch (e) {
         return pubDateRaw;
@@ -445,6 +493,24 @@ function classifyCredit(creditText) {
             alertDesc: "Aviso Crítico: Esta imagem não possui créditos de autoria definidos no RSS. O uso externo acarreta alto risco de infração de copyright."
         };
     }
+
+    // Regra específica: crédito conjunto de fonte pública deve prevalecer
+    if ((credit.includes("agência brasil") || credit.includes("agencia brasil")) && credit.includes("prefeitura do rio")) {
+        return {
+            category: "Institucional / Público",
+            riskLevel: "baixo_risco",
+            alertDesc: `Fonte Pública: Imagem de órgão público ou governamental (${creditText}). O uso jornalístico é permitido livremente mediante crédito.`
+        };
+    }
+
+    // Regra específica: créditos da Agência Brasil são fonte pública
+    if (credit.includes("agência brasil") || credit.includes("agencia brasil")) {
+        return {
+            category: "Institucional / Público",
+            riskLevel: "baixo_risco",
+            alertDesc: `Fonte Pública: Imagem de órgão público ou governamental (${creditText}). O uso jornalístico é permitido livremente mediante crédito.`
+        };
+    }
     
     // 1. Assinatura: AFP, Bloomberg, NYT (Não Crítico)
     const assinaturaKeywords = ["afp", "bloomberg", "nyt", "new york times"];
@@ -459,7 +525,14 @@ function classifyCredit(creditText) {
     }
     
     // 2. Getty / Agências Globais (Alto Risco)
-    const gettyKeywords = ["getty", "reuters", "ap photo", "associated press", "efe", "shutterstock", "istock"];
+    const gettyKeywords = [
+        "getty", "reuters", "ap photo", "associated press", "efe", "shutterstock", "istock",
+        "agência enquadrar", "agencia enquadrar", "arion marinho", "atopress", "brazil photo press",
+        "código19", "codigo19", "cris faga", "diaesportivo", "flávio hopp", "flavio hopp", "fotorua",
+        "fotoarena", "framephoto", "ishoot", "lc moreira", "mafalda press", "mdjphotos", "mochilapress",
+        "ofotográfico", "ofotografico", "onzex press", "pera photo", "photo premium", "thenews2",
+        "w9press", "wesley santos", "wpp", "zimel press"
+    ];
     for (const kw of gettyKeywords) {
         if (credit.includes(kw)) {
             return {
@@ -479,8 +552,8 @@ function classifyCredit(creditText) {
         };
     }
     
-    // 4. Divulgação / Comercial (Médio Risco)
-    const promoKeywords = ["divulgação", "acervo pessoal", "assessoria", "dino", "chatgpt", "midia", "anúncio", "publicidade", "patrocinado"];
+    // 4. Divulgação (Médio Risco)
+    const promoKeywords = ["divulgação", "acervo pessoal", "assessoria", "dino", "chatgpt", "midia", "anúncio", "publicidade"];
     for (const kw of promoKeywords) {
         if (credit.includes(kw)) {
             return {
@@ -492,7 +565,7 @@ function classifyCredit(creditText) {
     }
     
     // 5. Governamental / Institucional (Baixo Risco)
-    const govKeywords = ["senado", "câmara", "bndes", "governo", "gov.br", "agência brasil", "prefeitura", "ministério", "palácio do planalto"];
+    const govKeywords = ["senado", "câmara", "bndes", "governo", "gov.br", "agência brasil", "agencia brasil", "prefeitura", "ministério", "palácio do planalto"];
     for (const kw of govKeywords) {
         if (credit.includes(kw)) {
             return {
@@ -595,7 +668,7 @@ function calculateKPIs(images) {
         // Estatísticas para a barra de distribuição por agência
         if (img.category === 'Getty / Agência Externa') getty++;
         else if (img.category === 'Assinatura') afp++;
-        else if (img.category === 'Divulgação / Comercial') promo++;
+        else if (img.category === 'Divulgação') promo++;
         else if (img.category === 'Sem Crédito') noCredit++;
         else if (img.category === 'Interno (O Globo)') internal++;
         else if (img.category === 'Institucional / Público') gov++;
@@ -680,6 +753,18 @@ function applyFiltersAndRender() {
     if (AppState.currentFilter !== 'all') {
         images = images.filter(img => img.category === AppState.currentFilter);
     }
+
+    // A2. Filtrar por Editoria (mãe)
+    if (AppState.editoriaFilter !== 'all') {
+        const target = AppState.editoriaFilter;
+        images = images.filter(img => {
+            const normalized = (img.news_category || '').toLowerCase().trim();
+            return normalized === target
+                || normalized.startsWith(`${target} `)
+                || normalized.startsWith(`${target}/`)
+                || normalized.startsWith(`${target}-`);
+        });
+    }
     
     // B. Filtrar por Nível de Risco (KPIs)
     if (AppState.riskFilter !== 'all') {
@@ -744,7 +829,7 @@ function renderGrid(images) {
         // Mapeamento de badges de estilo
         const badgeClassMap = {
             'Getty / Agência Externa': 'badge-getty',
-            'Divulgação / Comercial': 'badge-promo',
+            'Divulgação': 'badge-promo',
             'Sem Crédito': 'badge-nocredit',
             'Interno (O Globo)': 'badge-internal',
             'Institucional / Público': 'badge-gov',
@@ -827,7 +912,7 @@ function openModal(img) {
     
     const riskBadgeMap = {
         'alto': 'RISCO ALTO (AGÊNCIA)',
-        'medio': 'DIVULGAÇÃO COMERCIAL',
+        'medio': 'DIVULGAÇÃO',
         'alerta': 'PERIGO (SEM CRÉDITO)',
         'baixo': 'BAIXO RISCO (INTERNO)',
         'baixo_risco': 'LIVRE (PÚBLICO)',
@@ -857,7 +942,7 @@ function openModal(img) {
     let auditTitle = 'Análise de Direitos Autorais';
     if (img.risk_level === 'alto') auditTitle = 'Alerta: Licenciamento Exclusivo e Restrito';
     else if (img.risk_level === 'alerta') auditTitle = 'Alerta Crítico: Copyright Não Identificado';
-    else if (img.risk_level === 'medio') auditTitle = 'Aviso: Material Promocional / Assessoria';
+    else if (img.risk_level === 'medio') auditTitle = 'Aviso: Material de Divulgação / Assessoria';
     else if (img.risk_level === 'baixo') auditTitle = 'Produção O Globo: Direitos Reservados';
     else if (img.risk_level === 'baixo_risco') auditTitle = 'Direitos Livres: Fonte Governamental';
     
